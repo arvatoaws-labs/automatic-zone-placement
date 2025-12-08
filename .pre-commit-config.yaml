@@ -1,8 +1,14 @@
 repos:
-
-
   - repo: local
     hooks:
+      - id: remove-pycaches
+        name: remove-pycaches
+        entry: bash -c 'find . -type d -name "__pycache__" -print0 | xargs -0 rm -rf'
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-commit, pre-push]
+
       - id: pytest
         name: pytest
         entry: pytest -q
@@ -11,6 +17,13 @@ repos:
         pass_filenames: false
         always_run: true
         stages: [pre-commit, pre-push]
+
+  - repo: https://github.com/compilerla/conventional-pre-commit
+    rev: v3.6.0
+    hooks:
+      - id: conventional-pre-commit
+        stages: [commit-msg]
+        args: []
 
   - repo: https://github.com/charliermarsh/ruff-pre-commit
     rev: v0.14.4
