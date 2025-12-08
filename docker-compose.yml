@@ -21,3 +21,31 @@ services:
       timeout: 10s
       retries: 3
       start_period: 10s
+
+  load-generator:
+    image: curlimages/curl:latest
+    container_name: zone-placement-load-generator
+    depends_on:
+      - automatic-zone-placement
+    command: >
+      sh -c "
+        while true; do
+          echo 'Testing 192.168.0.1.nip.io';
+          curl -s http://automatic-zone-placement:8080/192.168.0.1.nip.io || true;
+          echo ' ';
+          sleep 10;
+          echo 'Testing 192.168.32.1.nip.io';
+          curl -s http://automatic-zone-placement:8080/192.168.32.1.nip.io || true;
+          echo ' ';
+          sleep 10;
+          echo 'Testing 192.168.64.1.nip.io';
+          curl -s http://automatic-zone-placement:8080/192.168.64.1.nip.io || true;
+          echo ' ';
+          sleep 10;
+          echo 'Testing example.com';
+          curl -s http://automatic-zone-placement:8080/example.com || true;
+          echo ' ';
+          sleep 10;
+        done
+      "
+    restart: unless-stopped

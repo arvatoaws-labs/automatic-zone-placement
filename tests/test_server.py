@@ -3,6 +3,7 @@ import json
 import os
 import sys
 import tempfile
+import time
 from io import BytesIO
 from unittest.mock import patch, MagicMock
 import pytest
@@ -306,3 +307,236 @@ class TestResponseMethods:
         response = handler.wfile.getvalue().decode('utf-8')
         assert 'status' in response
         assert 'ok' in response
+
+
+class TestDNSCache:
+    """Test the DNS cache functionality."""
+    
+    def test_cache_initialization(self, temp_subnets_file):
+        """Test DNS cache is properly initialized."""
+        with patch.dict(os.environ, {'SUBNETS_FILE': temp_subnets_file, 'DNS_CACHE_TTL': '600'}):
+            if 'server' in sys.modules:
+                del sys.modules['server']
+            import server
+            
+            assert server.dns_cache is not None
+            assert server.dns_cache.default_ttl == 600
+            assert server.DNS_CACHE_TTL == 600
+    
+    def test_cache_set_and_get(self, temp_subnets_file):
+        """Test setting and getting values from cache."""
+        with patch.dict(os.environ, {'SUBNETS_FILE': temp_subnets_file}):
+            if 'server' in sys.modules:
+                del sys.modules['server']
+            import server
+            
+            # Clear any existing cache
+            server.dns_cache.cache.clear()
+            
+            # Set a value
+            server.dns_cache.set('test.example.com', '192.168.1.1', ttl=60)
+            
+            # Get the value
+            cached_ip = server.dns_cache.get('test.example.com')
+            assert cached_ip == '192.168.1.1'
+    
+    def test_cache_miss(self, temp_subnets_file):
+        """Test cache miss returns None."""
+        with patch.dict(os.environ, {'SUBNETS_FILE': temp_subnets_file}):
+            if 'server' in sys.modules:
+                del sys.modules['server']
+            import server
+            
+            # Clear cache
+            server.dns_cache.cache.clear()
+            
+            # Try to get non-existent value
+            cached_ip = server.dns_cache.get('nonexistent.example.com')
+            assert cached_ip is None
+    
+    def test_cache_expiry(self, temp_subnets_file):
+        """Test that cache entries expire after TTL."""
+        with patch.dict(os.environ, {'SUBNETS_FILE': temp_subnets_file}):
+            if 'server' in sys.modules:
+                del sys.modules['server']
+            import server
+            
+            # Clear cache
+            server.dns_cache.cache.clear()
+            
+            # Set a value with very short TTL
+            server.dns_cache.set('test.example.com', '192.168.1.1', ttl=1)
+            
+            # Immediately get it - should work
+            cached_ip = server.dns_cache.get('test.example.com')
+            assert cached_ip == '192.168.1.1'
+            
+            # Wait for expiry
+            time.sleep(1.1)
+            
+            # Now it should be expired
+            cached_ip = server.dns_cache.get('test.example.com')
+            assert cached_ip is None
+    
+    def test_cache_clear_expired(self, temp_subnets_file):
+        """Test clearing expired entries."""
+        with patch.dict(os.environ, {'SUBNETS_FILE': temp_subnets_file}):
+            if 'server' in sys.modules:
+                del sys.modules['server']
+            import server
+            
+            # Clear cache
+            server.dns_cache.cache.clear()
+            
+            # Add some entries with different TTLs
+            server.dns_cache.set('short.example.com', '192.168.1.1', ttl=1)
+            server.dns_cache.set('long.example.com', '192.168.1.2', ttl=3600)
+            
+            # Both should be in cache
+            assert len(server.dns_cache.cache) == 2
+            
+            # Wait for short TTL to expire
+            time.sleep(1.1)
+            
+            # Try to access the expired entry - this should trigger cleanup
+            assert server.dns_cache.get('short.example.com') is None
+            
+            # Long-lived entry should still be accessible
+            assert server.dns_cache.get('long.example.com') == '192.168.1.2'
+            
+            # Now cache should only have one entry
+            assert len(server.dns_cache.cache) == 1
+    
+    def test_cache_stats(self, temp_subnets_file):
+        """Test cache statistics."""
+        with patch.dict(os.environ, {'SUBNETS_FILE': temp_subnets_file}):
+            if 'server' in sys.modules:
+                del sys.modules['server']
+            import server
+            
+            # Clear cache
+            server.dns_cache.cache.clear()
+            
+            # Add some entries
+            server.dns_cache.set('test1.example.com', '192.168.1.1')
+            server.dns_cache.set('test2.example.com', '192.168.1.2')
+            server.dns_cache.set('test3.example.com', '192.168.1.3')
+            
+            # Get stats
+            stats = server.dns_cache.stats()
+            
+            assert stats['total_entries'] == 3
+            assert 'test1.example.com' in stats['entries']
+            assert 'test2.example.com' in stats['entries']
+            assert 'test3.example.com' in stats['entries']
+    
+    def test_cache_stats_endpoint(self, mock_request_handler):
+        """Test /cache/stats endpoint."""
+        handler, server = mock_request_handler
+        
+        # Clear and add some test data
+        server.dns_cache.cache.clear()
+        server.dns_cache.set('test.example.com', '192.168.1.1')
+        
+        handler.path = '/cache/stats'
+        handler.do_GET()
+        
+        response = handler.wfile.getvalue().decode('utf-8')
+        json_part = response.split('\r\n\r\n')[-1]
+        stats = json.loads(json_part)
+        
+        assert 'total_entries' in stats
+        assert 'entries' in stats
+        assert 'ttl' in stats
+        assert stats['total_entries'] >= 0
+    
+    def test_get_ip_address_uses_cache(self, mock_request_handler):
+        """Test that _get_ip_address uses cache."""
+        handler, server = mock_request_handler
+        
+        # Clear cache
+        server.dns_cache.cache.clear()
+        
+        # Mock socket.gethostbyname
+        with patch('socket.gethostbyname', return_value='192.168.1.1') as mock_dns:
+            # First call - should hit DNS
+            ip1 = server.RequestHandler._get_ip_address('test.example.com')
+            assert ip1 == '192.168.1.1'
+            assert mock_dns.call_count == 1
+            
+            # Second call - should use cache
+            ip2 = server.RequestHandler._get_ip_address('test.example.com')
+            assert ip2 == '192.168.1.1'
+            assert mock_dns.call_count == 1  # Should not have called DNS again
+            
+            # Verify it's in cache
+            cached_ip = server.dns_cache.get('test.example.com')
+            assert cached_ip == '192.168.1.1'
+    
+    def test_cache_thread_safety(self, temp_subnets_file):
+        """Test that cache operations are thread-safe."""
+        with patch.dict(os.environ, {'SUBNETS_FILE': temp_subnets_file}):
+            if 'server' in sys.modules:
+                del sys.modules['server']
+            import server
+            import threading
+            
+            # Clear cache
+            server.dns_cache.cache.clear()
+            
+            # Function to set cache entries
+            def set_entries(prefix, count):
+                for i in range(count):
+                    server.dns_cache.set(f'{prefix}{i}.example.com', f'192.168.1.{i}')
+            
+            # Function to get cache entries
+            def get_entries(prefix, count):
+                for i in range(count):
+                    server.dns_cache.get(f'{prefix}{i}.example.com')
+            
+            # Create multiple threads
+            threads = []
+            threads.append(threading.Thread(target=set_entries, args=('thread1-', 10)))
+            threads.append(threading.Thread(target=set_entries, args=('thread2-', 10)))
+            threads.append(threading.Thread(target=get_entries, args=('thread1-', 10)))
+            
+            # Start all threads
+            for thread in threads:
+                thread.start()
+            
+            # Wait for all threads to complete
+            for thread in threads:
+                thread.join()
+            
+            # Verify cache has entries (exact count may vary due to timing)
+            stats = server.dns_cache.stats()
+            assert stats['total_entries'] > 0
+    
+    def test_successful_lookup_with_cache(self, mock_request_handler):
+        """Test full request flow with caching."""
+        handler, server = mock_request_handler
+        
+        # Clear cache
+        server.dns_cache.cache.clear()
+        
+        handler.path = '/db.example.com'
+        
+        # Mock DNS resolution
+        with patch('socket.gethostbyname', return_value='192.168.1.1') as mock_dns:
+            # First request
+            handler.do_GET()
+            response1 = handler.wfile.getvalue().decode('utf-8')
+            
+            # Reset handler output
+            handler.wfile = BytesIO()
+            
+            # Second request - should use cache
+            handler.do_GET()
+            response2 = handler.wfile.getvalue().decode('utf-8')
+            
+            # DNS should only be called once
+            assert mock_dns.call_count == 1
+            
+            # Both responses should be successful
+            assert 'eu-central-1b' in response1
+            assert 'eu-central-1b' in response2

@@ -6,6 +6,8 @@ In Kubernetes, it is not possible to schedule Pods for optimal network performan
 
 This project offers a solution by making Kubernetes-aware of network topology outside the cluster. A lightweight **lookup service** provides an endpoint to resolve an external resource's domain name to an IP address and maps it to a known network zone (like an AWS Availability Zone). This data is used with a mutating webhook to inject node affinity rules into Pods at creation time. This ensures Pods are scheduled in the same zone as the external resources they depend on, optimizing for low-latency communication. The mechanism is generic and works for any external resource, on-prem or in the cloud, as long as its FQDN resolves to a single IP in a known subnet.
 
+The service includes built-in Prometheus metrics for monitoring DNS lookups, cache performance, and zone placement operations, making it easy to observe and optimize the system's behavior.
+
 This approach can yield significant performance improvements; a simple `pgbench` benchmark demonstrates a ~175% to ~375% improvement in [TPS](https://en.wikipedia.org/wiki/Transactions_per_second). Any workload that is latency-sensitive can benefit from this.
 
 _Note: This is not a fix for placing related workloads running in the same cluster relatively near each other. That is a problem already solved in Kubernetes with affinity rules and smart use of label selectors._
@@ -109,26 +111,89 @@ For this to work, you need the following present in your Kubernetes environment:
 
 ### Step 1: Gather Zone Information
 
-To gather zone information, use this command and bring the output into the `SUBNETS_DATA` array in `resources/server.py`:
+To gather zone information, use this command to get the subnet data for your AWS environment:
 
 ```sh
-$ aws ec2 describe-subnets --query 'Subnets[*].{CIDRBlock:CidrBlock, AvailabilityZone:AvailabilityZone, AvailabilityZoneId:AvailabilityZoneId}' --output json | jq '.[]' -c | sort | uniq | sed 's/$/,/g' | sed '$s/\,$//g'
-{"CIDRBlock":"10.0.192.0/20","AvailabilityZone":"eu-central-1b","AvailabilityZoneId":"euc1-az3"},
-{"CIDRBlock":"192.168.0.0/19","AvailabilityZone":"eu-central-1b","AvailabilityZoneId":"euc1-az3"},
-{"CIDRBlock":"192.168.128.0/19","AvailabilityZone":"eu-central-1a","AvailabilityZoneId":"euc1-az2"},
-{"CIDRBlock":"192.168.160.0/19","AvailabilityZone":"eu-central-1c","AvailabilityZoneId":"euc1-az1"},
-{"CIDRBlock":"192.168.32.0/19","AvailabilityZone":"eu-central-1a","AvailabilityZoneId":"euc1-az2"},
-{"CIDRBlock":"192.168.64.0/19","AvailabilityZone":"eu-central-1c","AvailabilityZoneId":"euc1-az1"},
-{"CIDRBlock":"192.168.96.0/19","AvailabilityZone":"eu-central-1b","AvailabilityZoneId":"euc1-az3"}
+$ aws ec2 describe-subnets --query 'Subnets[*].{CIDRBlock:CidrBlock, AvailabilityZone:AvailabilityZone, AvailabilityZoneId:AvailabilityZoneId}' --output json
+[
+  {"CIDRBlock":"10.0.192.0/20","AvailabilityZone":"eu-central-1b","AvailabilityZoneId":"euc1-az3"},
+  {"CIDRBlock":"192.168.0.0/19","AvailabilityZone":"eu-central-1b","AvailabilityZoneId":"euc1-az3"},
+  {"CIDRBlock":"192.168.128.0/19","AvailabilityZone":"eu-central-1a","AvailabilityZoneId":"euc1-az2"},
+  {"CIDRBlock":"192.168.160.0/19","AvailabilityZone":"eu-central-1c","AvailabilityZoneId":"euc1-az1"},
+  {"CIDRBlock":"192.168.32.0/19","AvailabilityZone":"eu-central-1a","AvailabilityZoneId":"euc1-az2"},
+  {"CIDRBlock":"192.168.64.0/19","AvailabilityZone":"eu-central-1c","AvailabilityZoneId":"euc1-az1"},
+  {"CIDRBlock":"192.168.96.0/19","AvailabilityZone":"eu-central-1b","AvailabilityZoneId":"euc1-az3"}
+]
 ```
 
 _**Note:** Having multiple AWS Accounts, VPC peerings or Transit Gateways? Map them as well. This will enable you to optimize Pod placement for even more external resources._
 
-### Step 2: Deploy the Lookup Service
+### Step 2: Deploy the Lookup Service with Helm
 
-The lookup service is available at `resources/server.py`, implemented in Python with no dependencies. `resources/automatic-zone-lookup.yaml` deploys a Deployment with using an alpine container with the Python code injected as a ConfigMap, with a Service called `automatic-zone-placement` which Kyverno can utilize.
+The recommended way to deploy the lookup service is using the provided Helm chart. First, update the `helm/values.yaml` file with your subnet information in the `subnets` field:
 
-Deploy the service:
+```yaml
+subnets: |
+  [
+    {"CIDRBlock":"192.168.0.0/19","AvailabilityZone":"eu-central-1b","AvailabilityZoneId":"euc1-az3"},
+    {"CIDRBlock":"192.168.32.0/19","AvailabilityZone":"eu-central-1a","AvailabilityZoneId":"euc1-az2"},
+    {"CIDRBlock":"192.168.64.0/19","AvailabilityZone":"eu-central-1c","AvailabilityZoneId":"euc1-az1"}
+  ]
+```
+
+Then deploy using Helm:
+
+```sh
+$ helm install automatic-zone-placement ./helm -n kyverno --create-namespace
+NAME: automatic-zone-placement
+LAST DEPLOYED: [timestamp]
+NAMESPACE: kyverno
+STATUS: deployed
+REVISION: 1
+```
+
+The Helm chart will deploy:
+- A Deployment running the lookup service (containerized Python application)
+- A ConfigMap containing your subnet configuration
+- A Service called `automatic-zone-placement` which Kyverno can utilize
+- Optional HPA, PodDisruptionBudget, and other production-ready configurations
+- Optional ServiceMonitor for Prometheus Operator integration
+
+#### Monitoring with Prometheus
+
+The lookup service exposes Prometheus metrics at `/metrics`. To enable automatic scraping with Prometheus Operator, set `serviceMonitor.enabled: true` in your `values.yaml`:
+
+```yaml
+serviceMonitor:
+  enabled: true
+  interval: 30s
+  scrapeTimeout: 10s
+  additionalLabels:
+    release: prometheus  # Adjust to match your Prometheus instance label
+```
+
+The service tracks metrics including:
+- `http_requests_total` - Total HTTP requests by method, path, and status
+- `dns_lookups_total` - Total DNS lookups performed
+- `dns_cache_hits_total` / `dns_cache_misses_total` - Cache hit/miss rates
+- `zone_lookups_success_total` / `zone_lookups_failure_total` - Zone lookup results
+- `dns_cache_size` - Current number of cached DNS entries
+
+#### DNS Cache Configuration
+
+The service includes an intelligent DNS cache to reduce lookup latency and external DNS queries. Configure it via environment variables:
+
+```yaml
+environment:
+  DNS_CACHE_TTL: 300        # Cache TTL in seconds (default: 5 minutes)
+  DNS_CACHE_MAXSIZE: 1000   # Maximum cache entries (default: 1000)
+  LOG_LEVEL: INFO           # Log level: DEBUG, INFO, WARNING, ERROR, CRITICAL
+```
+
+<details>
+<summary>Alternative: Manual Deployment</summary>
+
+If you prefer to deploy manually without Helm, you can use the resources in the `resources/` directory:
 
 ```sh
 $ cd resources/
@@ -138,6 +203,9 @@ $ kubectl create -f automatic-zone-lookup.yaml -n kyverno
 service/automatic-zone-placement created
 deployment.apps/automatic-zone-placement created
 ```
+
+Note: You'll need to manually update the `SUBNETS_DATA` array in `resources/server.py` with your subnet information.
+</details>
 
 ### Step 3: Deploy the Mutating Policy
 
@@ -152,7 +220,26 @@ clusterpolicy.kyverno.io/automatic-zone-placement created
 
 _Note: You need to make your own considerations on how you want to the mutation for your Pods to look like. A simpler nodeSelector would also work._
 
-### Step 4: Test the Solution
+### Step 4: Verify the Deployment
+
+Check that the lookup service is running:
+
+```sh
+$ kubectl get pods -n kyverno -l app.kubernetes.io/name=automatic-zone-placement
+NAME                                        READY   STATUS    RESTARTS   AGE
+automatic-zone-placement-7d4f8b5c9d-abcde   1/1     Running   0          1m
+automatic-zone-placement-7d4f8b5c9d-fghij   1/1     Running   0          1m
+```
+
+Test the service endpoint:
+
+```sh
+$ kubectl run -it --rm debug --image=curlimages/curl --restart=Never -n kyverno -- \
+  curl http://automatic-zone-placement/192.168.0.1.nip.io
+{"zone":"eu-central-1b","zoneId":"euc1-az3"}
+```
+
+### Step 5: Test the Solution
 
 Deploy a pod with the required annotation to see the mutation in action:
 
@@ -246,7 +333,7 @@ So the math checks out :)
 The Python script has example CIDR ranges and can be run locally for testing.
 
 ```sh
-$ python3 ./resources/server.py &
+$ python3 ./src/server.py &
 [...]
 $ curl localhost:8080/192.168.0.1.nip.io | jq
 {
@@ -259,6 +346,49 @@ $ curl localhost:8080/192.168.32.1.nip.io | jq
   "zoneId": "euc1-az2"
 }
 ```
+
+### Additional Endpoints
+
+The service provides several endpoints for health checks and monitoring:
+
+```sh
+# Health check endpoints
+$ curl localhost:8080/healthz
+{"status":"ok"}
+
+$ curl localhost:8080/readyz
+{"status":"ok"}
+
+# DNS cache statistics
+$ curl localhost:8080/cache/stats | jq
+{
+  "total_entries": 5,
+  "entries": ["google.com", "amazon.com"],
+  "maxsize": 1000,
+  "ttl": 300
+}
+
+# Prometheus metrics
+$ curl localhost:8080/metrics
+# HELP http_requests_total Total number of HTTP requests
+# TYPE http_requests_total counter
+http_requests_total{method="GET",path="/healthz",status="200"} 42.0
+...
+```
+
+### Docker Compose Testing
+
+You can also test the service with Docker Compose, which includes a load generator for realistic testing:
+
+```sh
+$ docker-compose up
+```
+
+This will start:
+- The lookup service on port 8080
+- A load generator that continuously queries various domains
+
+Watch the metrics endpoint to see the DNS cache and zone lookups in action.
 
 _Note: Beware that your local DNS resolver might implement DNS rebinding protection, which may result in failure to resolve local and private IP addresses. Using nip.io won't work in that case._
 
