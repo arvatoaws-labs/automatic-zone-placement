@@ -1,5 +1,3 @@
-# No external dependencies required for production
-# All imports in server.py are from Python standard library
-
-# Development/Testing dependencies
-pytest>=7.4.0
+# Production dependencies
+prometheus_client>=0.19.0
+cachetools>=5.3.0

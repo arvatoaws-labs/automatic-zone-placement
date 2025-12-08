@@ -11,9 +11,16 @@ repos:
 
       - id: pytest
         name: pytest
-        entry: pytest -q
+        entry: ./.pre-commit-install-deps.sh
         language: python
-        additional_dependencies: [pytest]
+        pass_filenames: false
+        always_run: true
+        stages: [pre-commit, pre-push]
+
+      - id: helm-template
+        name: helm-template
+        entry: bash -c 'helm template ./helm --debug'
+        language: system
         pass_filenames: false
         always_run: true
         stages: [pre-commit, pre-push]
