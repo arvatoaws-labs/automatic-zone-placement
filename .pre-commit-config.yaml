@@ -17,6 +17,14 @@ repos:
         always_run: true
         stages: [pre-commit, pre-push]
 
+      - id: helm-template
+        name: helm-template
+        entry: bash -c 'helm template ./helm --debug'
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-commit, pre-push]
+
   - repo: https://github.com/compilerla/conventional-pre-commit
     rev: v3.6.0
     hooks:

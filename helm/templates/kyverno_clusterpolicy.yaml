@@ -34,11 +34,11 @@ spec:
         apiCall:
           method: GET
           service:
-            url: http://{{ include "automatic-zone-placement.fullname" . }}.{{ .Release.Namespace }}:{{ .Values.service.port }}/{{ request.object.metadata.annotations."automatic-zone-placement" }}
+            url: http://{{ include "automatic-zone-placement.fullname" . }}.{{ .Release.Namespace }}:{{ .Values.service.port }}/{{ `{{ request.object.metadata.annotations."automatic-zone-placement" }}` }}
     preconditions:
       all: # Check that the returned data is a valid AWS zone.
            # Key is 'true' if the regex matches the returned json payload: result.zone. 'false' otherwise
-      - key: "{{ regex_match('^(us|eu|ap|sa|ca|cn|me|af)-(north|south|central|east|west|northeast|southeast|westcentral|southcentral)-[0-9][a-z]$','{{ result.zone }}') }}"
+      - key: "{{ `{{ regex_match('^(us|eu|ap|sa|ca|cn|me|af)-(north|south|central|east|west|northeast|southeast|westcentral|southcentral)-[0-9][a-z]$','{{ result.zone }}') }}` }}"
         operator: Equals
         value: true
         message: "Returned zone is not a valid AWS zone: ^(us|eu|ap|sa|ca|cn|me|af)-(north|south|central|east|west|northeast|southeast|westcentral|southcentral)-[0-9][a-z]$"
@@ -54,7 +54,7 @@ spec:
               - key: topology.kubernetes.io/zone
                 operator: In
                 values:
-                - {{ result.zone }}
+                - {{ `{{ result.zone }}` }}
         # Example on how to make the placement "hard" by using requiredDuringSchedulingIgnoredDuringExecution
         # - op: add
         #   path: "/spec/affinity/nodeAffinity/requiredDuringSchedulingIgnoredDuringExecution/nodeSelectorTerms/-"
@@ -63,5 +63,5 @@ spec:
         #     - key: topology.kubernetes.io/zone
         #       operator: In
         #       values:
-        #       - {{ result.zone }}
+        #       - {{ `{{ result.zone }}` }}
 {{- end }}
