@@ -1,3 +1,4 @@
+import importlib
 import json
 import os
 import sys
@@ -58,6 +59,11 @@ def mock_request_handler(temp_subnets_file):
         handler = server.RequestHandler(mock_request, mock_client_address, mock_server)
         handler.wfile = BytesIO()
         
+        # Set required attributes for Python 3.14+ compatibility
+        handler.request_version = 'HTTP/1.1'
+        handler.requestline = 'GET / HTTP/1.1'
+        handler.command = 'GET'
+        
         yield handler, server
 
 
@@ -80,7 +86,7 @@ class TestLoadSubnetsData:
             with pytest.raises(SystemExit):
                 if 'server' in sys.modules:
                     del sys.modules['server']
-                import server
+                importlib.import_module('server')
     
     def test_load_subnets_invalid_json(self):
         """Test that sys.exit is called when JSON is invalid."""
@@ -93,7 +99,7 @@ class TestLoadSubnetsData:
                 with pytest.raises(SystemExit):
                     if 'server' in sys.modules:
                         del sys.modules['server']
-                    import server
+                    importlib.import_module('server')
         finally:
             if os.path.exists(temp_path):
                 os.unlink(temp_path)

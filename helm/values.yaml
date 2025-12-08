@@ -34,6 +34,10 @@ serviceAccount:
 # This is for setting Kubernetes Annotations to a Pod.
 # For more information checkout: https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations/
 podAnnotations: {}
+# Uncomment to enable automatic pod restarts when secrets/configmaps change
+# Requires Reloader from Stakater: https://github.com/stakater/Reloader
+# reloader.stakater.com/auto: "true"
+
 # This is for setting Kubernetes Labels to a Pod.
 # For more information checkout: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/
 podLabels: {}
@@ -110,6 +114,13 @@ podDisruptionBudget:
   enabled: true
   minAvailable: 1
   # maxUnavailable: 1
+
+# Environment variables for the application
+environment:
+  # Log level: DEBUG, INFO, WARNING, ERROR, CRITICAL
+  LOG_LEVEL: INFO
+  # Port the application listens on
+  PORT: 8080
 
 # Subnet configuration for zone placement
 # This data will be mounted as subnets.json in the container
