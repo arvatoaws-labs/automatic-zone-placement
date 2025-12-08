@@ -43,13 +43,16 @@ spec:
           env:
             - name: SUBNETS_FILE
               value: "/config/subnets.json"
+              # Port the application listens on
+            - name: PORT
+              value: "8080"
             {{- range $key, $value := .Values.environment }}
             - name: {{ $key }}
               value: {{ $value | quote }}
             {{- end }}
           ports:
             - name: http
-              containerPort: {{ .Values.service.port }}
+              containerPort: 8080
               protocol: TCP
           {{- with .Values.livenessProbe }}
           livenessProbe:

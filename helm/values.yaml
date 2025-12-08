@@ -107,8 +107,6 @@ podDisruptionBudget:
 environment:
   # Log level: DEBUG, INFO, WARNING, ERROR, CRITICAL
   LOG_LEVEL: INFO
-  # Port the application listens on
-  PORT: 8080
 # Subnet configuration for zone placement
 # This data will be mounted as subnets.json in the container
 # You can paste the full JSON array here directly
