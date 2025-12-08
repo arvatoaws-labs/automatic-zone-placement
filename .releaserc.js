@@ -13,7 +13,7 @@ module.exports = {
           'yq e -i \'.image.tag = "${nextRelease.version}"\' helm/values.yaml',
           'sed -i "s/--version [0-9]\\+\\.[0-9]\\+\\.[0-9]\\+/--version ${nextRelease.version}/g" README.md',
           'sed -i "s/gh release download v[0-9]\\+\\.[0-9]\\+\\.[0-9]\\+/gh release download v${nextRelease.version}/g" README.md',
-          'sed -i "s/s3-resource-operator:[0-9]\\+\\.[0-9]\\+\\.[0-9]\\+/s3-resource-operator:${nextRelease.version}/g" README.md',
+          'sed -i "s/automatic-zone-placement:[0-9]\\+\\.[0-9]\\+\\.[0-9]\\+/automatic-zone-placement:${nextRelease.version}/g" README.md',
           'MAJOR=$(echo ${nextRelease.version} | cut -d. -f1) && MINOR=$(echo ${nextRelease.version} | cut -d. -f1-2) && sed -i -E "s/Tags: \`latest\`, \`[0-9]+\\.[0-9]+\\.[0-9]+\`, \`[0-9]+\\.[0-9]+\`, \`[0-9]+\`/Tags: \`latest\`, \`${nextRelease.version}\`, \`$MINOR\`, \`$MAJOR\`/g" README.md'
         ].join(' && '),
       },
