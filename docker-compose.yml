@@ -1,0 +1,23 @@
+version: '3.8'
+
+services:
+  automatic-zone-placement:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: automatic-zone-placement
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./subnets.json:/app/subnets.json:ro
+    environment:
+      - PORT=8080
+      - SUBNETS_FILE=/app/subnets.json
+      - LOG_LEVEL=INFO
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s

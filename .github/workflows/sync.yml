@@ -1,0 +1,40 @@
+name: Sync Main to Develop
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Sync main to develop
+        run: |
+          git checkout develop
+          git merge origin/main --no-ff -m "chore: sync main to develop [skip ci]"
+          git push origin develop
+
+      - name: Sync summary
+        run: |
+          echo "✅ Successfully synced main branch to develop"
+          echo "This includes:"
+          echo "  - CHANGELOG.md updates"
+          echo "  - Version bumps in Chart.yaml and values.yaml"
+          echo "  - Any hotfixes or patches applied to main"

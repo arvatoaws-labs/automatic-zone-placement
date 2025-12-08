@@ -10,20 +10,38 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 
 # --- Configuration ---
 # Configure logging to output to stdout
+log_level = os.environ.get('LOG_LEVEL', 'INFO').upper()
+try:
+    log_level_value = getattr(logging, log_level)
+except AttributeError:
+    log_level_value = logging.INFO
+    print(f"Warning: Invalid LOG_LEVEL '{log_level}', defaulting to INFO", file=sys.stderr)
+
 logging.basicConfig(
-    level=logging.INFO,
+    level=log_level_value,
     format='%(asctime)s - %(levelname)s - %(message)s',
     stream=sys.stdout
 )
 
-SUBNETS_DATA = [
-    {"CIDRBlock":"192.168.0.0/19","AvailabilityZone":"eu-central-1b","AvailabilityZoneId":"euc1-az3"},
-    {"CIDRBlock":"192.168.32.0/19","AvailabilityZone":"eu-central-1a","AvailabilityZoneId":"euc1-az2"},
-    {"CIDRBlock":"192.168.64.0/19","AvailabilityZone":"eu-central-1c","AvailabilityZoneId":"euc1-az1"},
-    {"CIDRBlock":"192.168.96.0/19","AvailabilityZone":"eu-central-1b","AvailabilityZoneId":"euc1-az3"},
-    {"CIDRBlock":"192.168.128.0/19","AvailabilityZone":"eu-central-1a","AvailabilityZoneId":"euc1-az2"},
-    {"CIDRBlock":"192.168.160.0/19","AvailabilityZone":"eu-central-1c","AvailabilityZoneId":"euc1-az1"}
-]
+def load_subnets_data():
+    """Load subnet data from external JSON file."""
+    # Check for external JSON file
+    subnets_file = os.environ.get("SUBNETS_FILE", "subnets.json")
+    
+    if os.path.exists(subnets_file):
+        try:
+            with open(subnets_file, 'r') as f:
+                subnets_data = json.load(f)
+            logging.info(f"Loaded subnet data from {subnets_file}")
+            return subnets_data
+        except (json.JSONDecodeError, IOError) as e:
+            logging.error(f"Failed to load subnet data from {subnets_file}: {e}.")
+            sys.exit(1)
+    else:
+        logging.info(f"Subnet file {subnets_file} not found.")
+        sys.exit(1)
+
+SUBNETS_DATA = load_subnets_data()
 
 try:
     CIDR_MAPPINGS = {
@@ -96,6 +114,14 @@ class RequestHandler(BaseHTTPRequestHandler):
     def log_message(self, format, *args):
         """Override default logging to use our configured logger, not stderr."""
         logging.info("%s - %s" % (self.address_string(), format % args))
+
+    def log_request(self, code='-', size='-'):
+        """Override log_request to handle missing requestline attribute."""
+        if hasattr(self, 'requestline'):
+            self.log_message('"%s" %s %s', self.requestline, str(code), str(size))
+        else:
+            # Fallback for test scenarios where requestline is not set
+            self.log_message('%s %s', str(code), str(size))
 
     @staticmethod
     def _get_ip_address(fqdn):
