@@ -16,14 +16,25 @@ logging.basicConfig(
     stream=sys.stdout
 )
 
-SUBNETS_DATA = [
-    {"CIDRBlock":"192.168.0.0/19","AvailabilityZone":"eu-central-1b","AvailabilityZoneId":"euc1-az3"},
-    {"CIDRBlock":"192.168.32.0/19","AvailabilityZone":"eu-central-1a","AvailabilityZoneId":"euc1-az2"},
-    {"CIDRBlock":"192.168.64.0/19","AvailabilityZone":"eu-central-1c","AvailabilityZoneId":"euc1-az1"},
-    {"CIDRBlock":"192.168.96.0/19","AvailabilityZone":"eu-central-1b","AvailabilityZoneId":"euc1-az3"},
-    {"CIDRBlock":"192.168.128.0/19","AvailabilityZone":"eu-central-1a","AvailabilityZoneId":"euc1-az2"},
-    {"CIDRBlock":"192.168.160.0/19","AvailabilityZone":"eu-central-1c","AvailabilityZoneId":"euc1-az1"}
-]
+def load_subnets_data():
+    """Load subnet data from external JSON file."""
+    # Check for external JSON file
+    subnets_file = os.environ.get("SUBNETS_FILE", "subnets.json")
+    
+    if os.path.exists(subnets_file):
+        try:
+            with open(subnets_file, 'r') as f:
+                subnets_data = json.load(f)
+            logging.info(f"Loaded subnet data from {subnets_file}")
+            return subnets_data
+        except (json.JSONDecodeError, IOError) as e:
+            logging.error(f"Failed to load subnet data from {subnets_file}: {e}.")
+            sys.exit(1)
+    else:
+        logging.info(f"Subnet file {subnets_file} not found.")
+        sys.exit(1)
+
+SUBNETS_DATA = load_subnets_data()
 
 try:
     CIDR_MAPPINGS = {
