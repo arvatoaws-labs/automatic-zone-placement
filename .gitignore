@@ -52,3 +52,6 @@ logs/
 # Kubernetes local config
 kubeconfig
 *.kubeconfig
+
+# is dynamically generated from the helm chart for testing
+resources/kyverno_clusterpolicy.yaml

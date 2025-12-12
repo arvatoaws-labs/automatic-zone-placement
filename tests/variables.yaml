@@ -1,0 +1,11 @@
+apiVersion: cli.kyverno.io/v1alpha1
+kind: Values
+metadata:
+  name: values
+policies:
+  - name: automatic-zone-placement
+    rules:
+      - name: automatic-zone-placement
+        values:
+          result:
+            zone: eu-central-1a
