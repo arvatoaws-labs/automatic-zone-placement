@@ -10,7 +10,7 @@ image:
   # This sets the pull policy for images.
   pullPolicy: IfNotPresent
   # Overrides the image tag whose default is the chart appVersion.
-  tag: "1.0.0"
+  tag: "1.1.0"
 # This is for the secrets for pulling an image from a private repository more information can be found here: https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/
 imagePullSecrets: []
 # This is to override the chart name.
@@ -107,7 +107,7 @@ podDisruptionBudget:
 environment:
   # Log level: DEBUG, INFO, WARNING, ERROR, CRITICAL
   LOG_LEVEL: INFO
-  DNS_CACHE_TTL: 300  # 5 minutes
+  DNS_CACHE_TTL: 300 # 5 minutes
   DNS_CACHE_MAXSIZE: 1000
 # Subnet configuration for zone placement
 # This data will be mounted as subnets.json in the container
@@ -121,11 +121,9 @@ subnets: |
     {"CIDRBlock":"192.168.128.0/19","AvailabilityZone":"eu-central-1a","AvailabilityZoneId":"euc1-az2"},
     {"CIDRBlock":"192.168.160.0/19","AvailabilityZone":"eu-central-1c","AvailabilityZoneId":"euc1-az1"}
   ]
-
 # Kyverno policy installation
 kyverno:
   enabled: false
-
 # ServiceMonitor for Prometheus Operator
 serviceMonitor:
   enabled: false

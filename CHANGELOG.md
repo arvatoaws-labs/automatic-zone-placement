@@ -1,3 +1,16 @@
+# [1.1.0](https://github.com/arvatoaws-labs/automatic-zone-placement/compare/v1.0.0...v1.1.0) (2025-12-08)
+
+
+### Bug Fixes
+
+* **helm:** hardcode PORT environment variable in deployment ([67f65ee](https://github.com/arvatoaws-labs/automatic-zone-placement/commit/67f65ee9ee0628a096e9a167a26bd8e3b6495bba))
+* updated helm kyverno policy ([e4db622](https://github.com/arvatoaws-labs/automatic-zone-placement/commit/e4db622d6cb3af530402d0035b20c6607e341102))
+
+
+### Features
+
+* add Prometheus metrics, caching improvements, and monitoring support ([99e4abb](https://github.com/arvatoaws-labs/automatic-zone-placement/commit/99e4abb3d38c77aad8cb366a6beaf0fc155a6ea3))
+
 # 1.0.0 (2025-12-08)
 
 
