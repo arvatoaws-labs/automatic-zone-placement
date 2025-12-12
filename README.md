@@ -156,6 +156,7 @@ The Helm chart will deploy:
 - A Deployment running the lookup service (containerized Python application)
 - A ConfigMap containing your subnet configuration
 - A Service called `automatic-zone-placement` which Kyverno can utilize
+- A Kyverno ClusterPolicy (enabled by default)
 - Optional HPA, PodDisruptionBudget, and other production-ready configurations
 - Optional ServiceMonitor for Prometheus Operator integration
 
@@ -190,37 +191,9 @@ environment:
   LOG_LEVEL: INFO           # Log level: DEBUG, INFO, WARNING, ERROR, CRITICAL
 ```
 
-<details>
-<summary>Alternative: Manual Deployment</summary>
 
-If you prefer to deploy manually without Helm, you can use the resources in the `resources/` directory:
 
-```sh
-$ cd resources/
-$ kubectl create configmap --from-file=server.py -n kyverno automatic-zone-placement
-configmap/automatic-zone-placement created
-$ kubectl create -f automatic-zone-lookup.yaml -n kyverno
-service/automatic-zone-placement created
-deployment.apps/automatic-zone-placement created
-```
-
-Note: You'll need to manually update the `SUBNETS_DATA` array in `resources/server.py` with your subnet information.
-</details>
-
-### Step 3: Deploy the Mutating Policy
-
-With the lookup service running, you can apply the Kyverno `ClusterPolicy` located in `resources/kyverno_clusterpolicy.yaml`. This policy will look for `Pod.CREATE` operations. If a Pod has the annotation `automatic-zone-placement`, it will call the lookup service to determine the optimal zone.
-
-Apply the policy:
-
-```sh
-$ kubectl apply -f kyverno_clusterpolicy.yaml
-clusterpolicy.kyverno.io/automatic-zone-placement created
-```
-
-_Note: You need to make your own considerations on how you want to the mutation for your Pods to look like. A simpler nodeSelector would also work._
-
-### Step 4: Verify the Deployment
+### Step 3: Verify the Deployment
 
 Check that the lookup service is running:
 
@@ -239,7 +212,7 @@ $ kubectl run -it --rm debug --image=curlimages/curl --restart=Never -n kyverno 
 {"zone":"eu-central-1b","zoneId":"euc1-az3"}
 ```
 
-### Step 5: Test the Solution
+### Step 4: Test the Solution
 
 Deploy a pod with the required annotation to see the mutation in action:
 

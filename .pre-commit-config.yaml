@@ -25,6 +25,22 @@ repos:
         always_run: true
         stages: [pre-commit, pre-push]
 
+      - id: helm-template-generate-kyverno-policy
+        name: helm-template-generate-kyverno-policy
+        entry: bash -c 'helm template automatic-zone-placement helm/ --show-only templates/kyverno_clusterpolicy.yaml > resources/kyverno_clusterpolicy.yaml'
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-commit, pre-push]
+
+      - id: kyverno-test
+        name: kyverno-test
+        entry: bash -c 'kyverno test tests -v9'
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-commit, pre-push]
+
   - repo: https://github.com/compilerla/conventional-pre-commit
     rev: v3.6.0
     hooks:

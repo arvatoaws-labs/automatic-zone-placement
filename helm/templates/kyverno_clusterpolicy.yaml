@@ -36,14 +36,19 @@ spec:
           service:
             url: http://{{ include "automatic-zone-placement.fullname" . }}.{{ .Release.Namespace }}:{{ .Values.service.port }}/{{ `{{ request.object.metadata.annotations."automatic-zone-placement" }}` }}
     preconditions:
-      all: # Check that the returned data is a valid AWS zone.
-           # Key is 'true' if the regex matches the returned json payload: result.zone. 'false' otherwise
-      - key: "{{ `{{ regex_match('^(us|eu|ap|sa|ca|cn|me|af)-(north|south|central|east|west|northeast|southeast|westcentral|southcentral)-[0-9][a-z]$','{{ result.zone }}') }}` }}"
+      all: 
+      # Check that the returned data is a valid AWS zone.
+      # Key is 'true' if the regex matches the returned json payload: result.zone. 'false' otherwise
+      - key: {{ "\"{{ regex_match('^(us|eu|ap|sa|ca|cn|me|af)-(north|south|central|east|west|northeast|southeast|westcentral|southcentral)-[0-9][a-z]$','{{ result.zone }}') }}\"" }}
         operator: Equals
         value: true
         message: "Returned zone is not a valid AWS zone: ^(us|eu|ap|sa|ca|cn|me|af)-(north|south|central|east|west|northeast|southeast|westcentral|southcentral)-[0-9][a-z]$"
+      - key: {{ "\"{{ request.object.spec.affinity.nodeAffinity.preferredDuringSchedulingIgnoredDuringExecution || `[]` | [?preference.matchExpressions[?key=='topology.kubernetes.io/zone']] | length(@) }}\"" }}
+        operator: Equals
+        value: 0
+        message: "Pod already has automatic zone placement configured"
     mutate:
-      # Soft-requirement to add the zone to the Pod spec. One could create a "hard" policy that uses requiredDuringSchedulingIgnoredDuringExecution (example provided in the commented-out section below)
+      # Soft-requirement to add the zone to the Pod spec.
       patchesJson6902: |-
         - op: add
           path: "/spec/affinity/nodeAffinity/preferredDuringSchedulingIgnoredDuringExecution/-"

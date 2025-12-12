@@ -140,7 +140,7 @@ subnets: |
   ]
 # Kyverno policy installation
 kyverno:
-  enabled: false
+  enabled: true
 # ServiceMonitor for Prometheus Operator
 serviceMonitor:
   enabled: false
