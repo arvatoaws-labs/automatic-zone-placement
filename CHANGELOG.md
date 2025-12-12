@@ -1,3 +1,10 @@
+# [1.2.0](https://github.com/arvatoaws-labs/automatic-zone-placement/compare/v1.1.0...v1.2.0) (2025-12-12)
+
+
+### Features
+
+* added topologySpreadConstraints and cleaned up policy ([0d5ab62](https://github.com/arvatoaws-labs/automatic-zone-placement/commit/0d5ab62bcb69ac78c080bbb9142ca8a0648e8c2b))
+
 # [1.1.0](https://github.com/arvatoaws-labs/automatic-zone-placement/compare/v1.0.0...v1.1.0) (2025-12-08)
 
 
