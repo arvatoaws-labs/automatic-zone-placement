@@ -98,6 +98,23 @@ volumeMounts: []
 nodeSelector: {}
 tolerations: []
 affinity: {}
+
+# Topology spread constraints for pod distribution
+# More information: https://kubernetes.io/docs/concepts/scheduling-eviction/topology-spread-constraints/
+topologySpreadConstraints: []
+# Example configuration to spread pods across zones and nodes:
+# - maxSkew: 1
+#   topologyKey: topology.kubernetes.io/zone
+#   whenUnsatisfiable: ScheduleAnyway
+#   labelSelector:
+#     matchLabels:
+#       app.kubernetes.io/name: automatic-zone-placement
+# - maxSkew: 1
+#   topologyKey: kubernetes.io/hostname
+#   whenUnsatisfiable: DoNotSchedule
+#   labelSelector:
+#     matchLabels:
+#       app.kubernetes.io/name: automatic-zone-placement
 # This section is for setting up PodDisruptionBudget more information can be found here: https://kubernetes.io/docs/tasks/run-application/configure-pdb/
 podDisruptionBudget:
   enabled: true

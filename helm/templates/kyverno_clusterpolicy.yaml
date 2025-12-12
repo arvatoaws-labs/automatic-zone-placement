@@ -55,13 +55,4 @@ spec:
                 operator: In
                 values:
                 - {{ `{{ result.zone }}` }}
-        # Example on how to make the placement "hard" by using requiredDuringSchedulingIgnoredDuringExecution
-        # - op: add
-        #   path: "/spec/affinity/nodeAffinity/requiredDuringSchedulingIgnoredDuringExecution/nodeSelectorTerms/-"
-        #   value:
-        #     matchExpressions:
-        #     - key: topology.kubernetes.io/zone
-        #       operator: In
-        #       values:
-        #       - {{ `{{ result.zone }}` }}
 {{- end }}
