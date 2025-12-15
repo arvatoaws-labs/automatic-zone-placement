@@ -1,3 +1,13 @@
+# [2.0.0](https://github.com/arvatoaws-labs/automatic-zone-placement/compare/v1.3.0...v2.0.0) (2025-12-15)
+
+
+* feat!: enforce strict API paths, add IP lookup, and validate FQDNs ([95305f2](https://github.com/arvatoaws-labs/automatic-zone-placement/commit/95305f2aa8347bdc0b5f6aba3f51076b39a52a0b))
+
+
+### BREAKING CHANGES
+
+* The service no longer accepts lookups at the root path (`/`). Clients must update to use `/fqdn/<hostname>`.
+
 # [1.3.0](https://github.com/arvatoaws-labs/automatic-zone-placement/compare/v1.2.0...v1.3.0) (2025-12-12)
 
 
