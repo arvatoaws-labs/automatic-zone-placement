@@ -137,10 +137,20 @@ class TestRequestHandler:
         response = handler.wfile.getvalue().decode('utf-8')
         assert 'Not Found' in response or '404' in response
     
-    def test_successful_fqdn_lookup(self, mock_request_handler):
-        """Test successful FQDN lookup and zone resolution."""
+    def test_legacy_path_returns_404(self, mock_request_handler):
+        """Test that legacy path format returns 404."""
         handler, server = mock_request_handler
         handler.path = '/test.example.com'
+        
+        handler.do_GET()
+        
+        response = handler.wfile.getvalue().decode('utf-8')
+        assert 'Not Found' in response or '404' in response
+
+    def test_successful_fqdn_lookup(self, mock_request_handler):
+        """Test successful FQDN lookup with /fqdn/ prefix."""
+        handler, server = mock_request_handler
+        handler.path = '/fqdn/test.example.com'
         
         # Mock DNS resolution to return an IP in our test subnet
         with patch.object(server.RequestHandler, '_get_ip_address', return_value='192.168.1.1'):
@@ -153,11 +163,67 @@ class TestRequestHandler:
         assert 'zoneId' in response_data
         assert response_data['zone'] == 'eu-central-1b'
         assert response_data['zoneId'] == 'euc1-az3'
+
+    def test_invalid_fqdn_format(self, mock_request_handler):
+        """Test invalid FQDN format."""
+        handler, server = mock_request_handler
+        
+        # Invalid chars (underscore is not allowed in hostnames by RFC 1123, though some resolvers allow it, our regex is strict)
+        # Actually underscore is allowed in domain names but not hostnames. Let's use something definitely invalid like !
+        handler.path = '/fqdn/invalid_fqdn!.com'
+        handler.do_GET()
+        response = handler.wfile.getvalue().decode('utf-8')
+        assert 'Invalid FQDN format' in response or '400' in response
+
+        # Reset
+        handler.wfile = BytesIO()
+        
+        # Starts with hyphen
+        handler.path = '/fqdn/-start.com'
+        handler.do_GET()
+        response = handler.wfile.getvalue().decode('utf-8')
+        assert 'Invalid FQDN format' in response or '400' in response
+
+    def test_successful_ip_lookup(self, mock_request_handler):
+        """Test successful IP lookup with /ip/ prefix."""
+        handler, server = mock_request_handler
+        handler.path = '/ip/192.168.1.1'
+        
+        handler.do_GET()
+        
+        response = handler.wfile.getvalue().decode('utf-8')
+        response_data = json.loads(response.split('\r\n\r\n')[-1])
+        
+        assert 'zone' in response_data
+        assert 'zoneId' in response_data
+        assert response_data['zone'] == 'eu-central-1b'
+        assert response_data['zoneId'] == 'euc1-az3'
+
+    def test_invalid_ip_format(self, mock_request_handler):
+        """Test invalid IP format with /ip/ prefix."""
+        handler, server = mock_request_handler
+        handler.path = '/ip/invalid-ip'
+        
+        handler.do_GET()
+        
+        response = handler.wfile.getvalue().decode('utf-8')
+        assert 'Invalid IP address format' in response or '400' in response
+
+    def test_ip_not_found(self, mock_request_handler):
+        """Test IP that is not in any subnet."""
+        handler, server = mock_request_handler
+        handler.path = '/ip/10.0.0.1'
+        
+        handler.do_GET()
+        
+        response = handler.wfile.getvalue().decode('utf-8')
+        assert 'Zone not found' in response or '404' in response
+
     
     def test_fqdn_not_found(self, mock_request_handler):
         """Test FQDN that cannot be resolved."""
         handler, server = mock_request_handler
-        handler.path = '/nonexistent.example.com'
+        handler.path = '/fqdn/nonexistent.example.com'
         
         # Mock DNS resolution failure
         with patch.object(server.RequestHandler, '_get_ip_address', side_effect=server.socket.gaierror):
@@ -169,7 +235,7 @@ class TestRequestHandler:
     def test_ip_not_in_subnet(self, mock_request_handler):
         """Test IP address that doesn't match any subnet."""
         handler, server = mock_request_handler
-        handler.path = '/test.example.com'
+        handler.path = '/fqdn/test.example.com'
         
         # Mock DNS resolution to return an IP not in our subnets
         with patch.object(server.RequestHandler, '_get_ip_address', return_value='10.0.0.1'):
@@ -181,7 +247,7 @@ class TestRequestHandler:
     def test_unexpected_error(self, mock_request_handler):
         """Test handling of unexpected errors."""
         handler, server = mock_request_handler
-        handler.path = '/test.example.com'
+        handler.path = '/fqdn/test.example.com'
         
         # Mock an unexpected exception
         with patch.object(server.RequestHandler, '_get_ip_address', side_effect=Exception("Unexpected error")):
@@ -519,7 +585,7 @@ class TestDNSCache:
         # Clear cache
         server.dns_cache.cache.clear()
         
-        handler.path = '/db.example.com'
+        handler.path = '/fqdn/db.example.com'
         
         # Mock DNS resolution
         with patch('socket.gethostbyname', return_value='192.168.1.1') as mock_dns:

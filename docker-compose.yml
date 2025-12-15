@@ -31,19 +31,19 @@ services:
       sh -c "
         while true; do
           echo 'Testing 192.168.0.1.nip.io';
-          curl -s http://automatic-zone-placement:8080/192.168.0.1.nip.io || true;
+          curl -s http://automatic-zone-placement:8080/fqdn/192.168.0.1.nip.io || true;
           echo ' ';
           sleep 10;
           echo 'Testing 192.168.32.1.nip.io';
-          curl -s http://automatic-zone-placement:8080/192.168.32.1.nip.io || true;
+          curl -s http://automatic-zone-placement:8080/fqdn/192.168.32.1.nip.io || true;
           echo ' ';
           sleep 10;
           echo 'Testing 192.168.64.1.nip.io';
-          curl -s http://automatic-zone-placement:8080/192.168.64.1.nip.io || true;
+          curl -s http://automatic-zone-placement:8080/fqdn/192.168.64.1.nip.io || true;
           echo ' ';
           sleep 10;
           echo 'Testing example.com';
-          curl -s http://automatic-zone-placement:8080/example.com || true;
+          curl -s http://automatic-zone-placement:8080/fqdn/example.com || true;
           echo ' ';
           sleep 10;
         done
