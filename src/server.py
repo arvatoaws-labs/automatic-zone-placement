@@ -2,6 +2,7 @@ import ipaddress
 import json
 import logging
 import os
+import re
 import signal
 import socket
 import sys
@@ -221,10 +222,61 @@ class RequestHandler(BaseHTTPRequestHandler):
             http_requests_total.labels(method='GET', path=self.path, status='400').inc()
             return
         
-        fqdn = self.path.strip('/')
+        # Handle direct IP lookup
+        if self.path.startswith('/ip/'):
+            ip_address = self.path[len('/ip/'):]
+            if not ip_address:
+                self.send_error_response(404, "Not Found. Please provide an IP address in the path, e.g., /ip/192.168.0.1")
+                http_requests_total.labels(method='GET', path='/ip', status='404').inc()
+                return
+            
+            logging.info(f"Received lookup request for IP: {ip_address}")
+            try:
+                # Validate IP format
+                ipaddress.ip_address(ip_address)
+                
+                zone_data = self._get_zone_data(ip_address)
+                if zone_data:
+                    logging.info(f"Found matching zone data for IP {ip_address}, zone: {zone_data['AvailabilityZone']}, zoneId: {zone_data['AvailabilityZoneId']}")
+                    zone_lookups_success_total.inc()
+                    self.send_json_response(200, {
+                        'zone': zone_data['AvailabilityZone'],
+                        'zoneId': zone_data['AvailabilityZoneId']
+                    })
+                    http_requests_total.labels(method='GET', path='/ip', status='200').inc()
+                else:
+                    logging.warning(f"No matching zone found for IP {ip_address}")
+                    zone_lookups_failure_total.inc()
+                    self.send_error_response(404, "Zone not found for the given IP")
+                    http_requests_total.labels(method='GET', path='/ip', status='404').inc()
+            except ValueError:
+                logging.warning(f"Invalid IP address format: {ip_address}")
+                self.send_error_response(400, "Invalid IP address format")
+                http_requests_total.labels(method='GET', path='/ip', status='400').inc()
+            except Exception as e:
+                logging.critical(f"An unexpected error occurred for IP {ip_address}: {e}", exc_info=True)
+                self.send_error_response(500, "Internal Server Error")
+                http_requests_total.labels(method='GET', path='/ip', status='500').inc()
+            return
+
+        # Extract FQDN from path
+        if not self.path.startswith('/fqdn/'):
+            self.send_error_response(404, "Not Found. Please use /fqdn/<hostname> or /ip/<ip_address>")
+            http_requests_total.labels(method='GET', path=self.path, status='404').inc()
+            return
+        
+        fqdn = self.path[len('/fqdn/'):]
+
         if not fqdn:
-            self.send_error_response(404, "Not Found. Please provide a FQDN in the path, e.g., /my.database.com")
+            self.send_error_response(404, "Not Found. Please provide a FQDN in the path, e.g., /fqdn/my.database.com")
             http_requests_total.labels(method='GET', path='/', status='404').inc()
+            return
+
+        # Validate FQDN format
+        if not self._is_valid_fqdn(fqdn):
+            logging.warning(f"Invalid FQDN format: {fqdn}")
+            self.send_error_response(400, "Invalid FQDN format")
+            http_requests_total.labels(method='GET', path='/fqdn', status='400').inc()
             return
 
         logging.info(f"Received lookup request for FQDN: {fqdn}")
@@ -330,6 +382,16 @@ class RequestHandler(BaseHTTPRequestHandler):
             logging.critical(f"An unexpected error occurred during DNS lookup for FQDN {fqdn}: {e}", exc_info=True)
             dns_lookups_failure_total.inc()
             raise
+
+    @staticmethod
+    def _is_valid_fqdn(fqdn):
+        """Validates FQDN format using regex."""
+        if len(fqdn) > 253:
+            return False
+        # RFC 1123 hostname validation
+        # Allows single label (e.g. localhost) or multiple labels separated by dots
+        pattern = r'^([a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)*[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?$'
+        return bool(re.match(pattern, fqdn))
 
     @staticmethod
     def _get_zone_data(ip_address_str):

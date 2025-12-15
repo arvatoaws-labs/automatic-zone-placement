@@ -1,5 +1,8 @@
 # Automatic zone placement service
 
+[![Test](https://github.com/arvatoaws-labs/automatic-zone-placement/actions/workflows/test.yml/badge.svg)](https://github.com/arvatoaws-labs/automatic-zone-placement/actions/workflows/test.yml)
+[![Release](https://github.com/arvatoaws-labs/automatic-zone-placement/actions/workflows/release.yml/badge.svg)](https://github.com/arvatoaws-labs/automatic-zone-placement/actions/workflows/release.yml)
+
 ## Overview
 
 In Kubernetes, it is not possible to schedule Pods for optimal network performance when Pods use resources outside of the cluster.
@@ -208,7 +211,7 @@ Test the service endpoint:
 
 ```sh
 $ kubectl run -it --rm debug --image=curlimages/curl --restart=Never -n kyverno -- \
-  curl http://automatic-zone-placement/192.168.0.1.nip.io
+  curl http://automatic-zone-placement/fqdn/192.168.0.1.nip.io
 {"zone":"eu-central-1b","zoneId":"euc1-az3"}
 ```
 
@@ -223,7 +226,7 @@ kind: Pod
 metadata:
   name: pgbench-with-annotation
   annotations:
-    automatic-zone-placement: my-rds-instance.cluster-c7eeqk68ktn1.eu-central-1.rds.amazonaws.com
+    automatic-zone-placement/fqdn: my-rds-instance.cluster-c7eeqk68ktn1.eu-central-1.rds.amazonaws.com
 spec:
   containers:
   - name: postgres
@@ -308,12 +311,12 @@ The Python script has example CIDR ranges and can be run locally for testing.
 ```sh
 $ python3 ./src/server.py &
 [...]
-$ curl localhost:8080/192.168.0.1.nip.io | jq
+$ curl localhost:8080/fqdn/192.168.0.1.nip.io | jq
 {
   "zone": "eu-central-1b",
   "zoneId": "euc1-az3"
 }
-$ curl localhost:8080/192.168.32.1.nip.io | jq
+$ curl localhost:8080/fqdn/192.168.32.1.nip.io | jq
 {
   "zone": "eu-central-1a",
   "zoneId": "euc1-az2"

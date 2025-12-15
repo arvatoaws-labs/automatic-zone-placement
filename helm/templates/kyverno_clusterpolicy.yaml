@@ -10,7 +10,7 @@ metadata:
     kyverno.io/kubernetes-version: "1.12"
     policies.kyverno.io/description: >-
       This policy enables automatic zone placement for Pods. If the Pod has an annotation
-      'automatic-zone-placement', it calls an external data source with the value as input. The external
+      'automatic-zone-placement/fqdn', it calls an external data source with the value as input. The external
       data source should return a valid AWS zone in the format '{"zone": "eu-north-1a"}'.
       The use-case for this policy is to ensure that the Pod is placed in the same zone as the
       resource it is communicating with. For instance, a Pod that communicates with a database
@@ -19,7 +19,7 @@ spec:
   failurePolicy: Ignore # Non-critical if the rule is not executed
   webhookTimeoutSeconds: 2
   rules:
-  - name: automatic-zone-placement
+  - name: automatic-zone-placement-fqdn
     match:
       all:
       - resources:
@@ -28,13 +28,54 @@ spec:
           operations:
           - CREATE
           annotations: # Matching on label selector is not used because of the value limit of 63 chars. A DNS name can be longer than 63 chars.
-            automatic-zone-placement: "*"
+            automatic-zone-placement/fqdn: "*"
     context: # Use the value of the automatic-zone-placement annotations to call the service
       - name: result
         apiCall:
           method: GET
           service:
-            url: http://{{ include "automatic-zone-placement.fullname" . }}.{{ .Release.Namespace }}:{{ .Values.service.port }}/{{ `{{ request.object.metadata.annotations."automatic-zone-placement" }}` }}
+            url: http://{{ include "automatic-zone-placement.fullname" . }}.{{ .Release.Namespace }}:{{ .Values.service.port }}/fqdn/{{ `{{ request.object.metadata.annotations."automatic-zone-placement/fqdn" }}` }}
+    preconditions:
+      all: 
+      # Check that the returned data is a valid AWS zone.
+      # Key is 'true' if the regex matches the returned json payload: result.zone. 'false' otherwise
+      - key: {{ "\"{{ regex_match('^(us|eu|ap|sa|ca|cn|me|af)-(north|south|central|east|west|northeast|southeast|westcentral|southcentral)-[0-9][a-z]$','{{ result.zone }}') }}\"" }}
+        operator: Equals
+        value: true
+        message: "Returned zone is not a valid AWS zone: ^(us|eu|ap|sa|ca|cn|me|af)-(north|south|central|east|west|northeast|southeast|westcentral|southcentral)-[0-9][a-z]$"
+      - key: {{ "\"{{ request.object.spec.affinity.nodeAffinity.preferredDuringSchedulingIgnoredDuringExecution || `[]` | [?preference.matchExpressions[?key=='topology.kubernetes.io/zone']] | length(@) }}\"" }}
+        operator: Equals
+        value: 0
+        message: "Pod already has automatic zone placement configured"
+    mutate:
+      # Soft-requirement to add the zone to the Pod spec.
+      patchesJson6902: |-
+        - op: add
+          path: "/spec/affinity/nodeAffinity/preferredDuringSchedulingIgnoredDuringExecution/-"
+          value:
+            weight: 100
+            preference:
+              matchExpressions:
+              - key: topology.kubernetes.io/zone
+                operator: In
+                values:
+                - {{ `{{ result.zone }}` }}
+  - name: automatic-zone-placement-ip
+    match:
+      all:
+      - resources:
+          kinds:
+          - Pod
+          operations:
+          - CREATE
+          annotations: # Matching on label selector is not used because of the value limit of 63 chars. A DNS name can be longer than 63 chars.
+            automatic-zone-placement/ip: "*"
+    context: # Use the value of the automatic-zone-placement annotations to call the service
+      - name: result
+        apiCall:
+          method: GET
+          service:
+            url: http://{{ include "automatic-zone-placement.fullname" . }}.{{ .Release.Namespace }}:{{ .Values.service.port }}/ip/{{ `{{ request.object.metadata.annotations."automatic-zone-placement/ip" }}` }}
     preconditions:
       all: 
       # Check that the returned data is a valid AWS zone.

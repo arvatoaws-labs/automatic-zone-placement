@@ -25,6 +25,14 @@ repos:
         always_run: true
         stages: [pre-commit, pre-push]
 
+      - id: create-resources-dir
+        name: create-resources-dir
+        entry: bash -c 'mkdir -p resources'
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-commit, pre-push]
+
       - id: helm-template-generate-kyverno-policy
         name: helm-template-generate-kyverno-policy
         entry: bash -c 'helm template automatic-zone-placement helm/ --show-only templates/kyverno_clusterpolicy.yaml > resources/kyverno_clusterpolicy.yaml'
