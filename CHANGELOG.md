@@ -1,3 +1,11 @@
+# [1.3.0](https://github.com/arvatoaws-labs/automatic-zone-placement/compare/v1.2.0...v1.3.0) (2025-12-12)
+
+
+### Features
+
+* prevent duplicate zone placement and add policy tests ([3560ff6](https://github.com/arvatoaws-labs/automatic-zone-placement/commit/3560ff674cccfc84872ae5cd178f1a39d2f14bdd))
+* prevent duplicate zone placement and add policy tests ([b32c14c](https://github.com/arvatoaws-labs/automatic-zone-placement/commit/b32c14c5b68241987d0a1a0e84fd0a0a0c67c3d0))
+
 # [1.2.0](https://github.com/arvatoaws-labs/automatic-zone-placement/compare/v1.1.0...v1.2.0) (2025-12-12)
 
 
